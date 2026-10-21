@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SprintBoard</title>
+<style>
+  body{font-family:system-ui,sans-serif;margin:0;background:#f4f5f7;color:#172b4d}
+  header{background:#0052cc;color:#fff;padding:16px 24px}
+  header h1{margin:0;font-size:1.3rem}
+  #progress{font-size:.9rem;opacity:.9;margin-top:4px}
+  form{display:flex;gap:8px;padding:16px 24px}
+  input{flex:1;padding:8px;border:1px solid #c1c7d0;border-radius:4px}
+  button{padding:8px 14px;border:0;border-radius:4px;background:#0052cc;color:#fff;cursor:pointer}
+  .board{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;padding:0 24px 24px}
+  .col{background:#ebecf0;border-radius:6px;padding:10px;min-height:200px}
+  .col h2{font-size:.8rem;text-transform:uppercase;color:#5e6c84;margin:0 0 8px}
+  .card{background:#fff;border-radius:4px;padding:10px;margin-bottom:8px;box-shadow:0 1px 2px rgba(9,30,66,.25)}
+  .card small button{background:#dfe1e6;color:#172b4d;padding:2px 8px;margin:6px 4px 0 0;font-size:.75rem}
+  @media(max-width:700px){.board{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header><h1>SprintBoard</h1><div id="progress"></div></header>
+<form id="f"><input id="title" placeholder="New task title" maxlength="100" required><button>Add task</button></form>
+<div class="board" id="board"></div>
+<script>
+const STATUSES=["To Do","In Progress","Done"];
+const json={"Content-Type":"application/json"};
+async function load(){
+  const [tasks,sum]=await Promise.all([fetch("/api/tasks").then(r=>r.json()),fetch("/api/summary").then(r=>r.json())]);
+  document.getElementById("progress").textContent=`${sum.counts["Done"]} of ${sum.total} done (${sum.percent_done}%)`;
+  const board=document.getElementById("board");board.innerHTML="";
+  STATUSES.forEach(s=>{
+    const col=document.createElement("div");col.className="col";
+    const h=document.createElement("h2");h.textContent=s;col.appendChild(h);
+    tasks.filter(t=>t.status===s).forEach(t=>{
+      const c=document.createElement("div");c.className="card";
+      const span=document.createElement("span");span.textContent=t.title;c.appendChild(span);
+      const small=document.createElement("small");small.appendChild(document.createElement("br"));
+      STATUSES.filter(x=>x!==s).forEach(x=>{
+        const b=document.createElement("button");b.textContent="→ "+x;b.onclick=()=>move(t.id,x);small.appendChild(b);
+      });
+      const d=document.createElement("button");d.textContent="Delete";d.onclick=()=>del(t.id);small.appendChild(d);
+      c.appendChild(small);col.appendChild(c);
+    });
+    board.appendChild(col);
+  });
+}
+async function move(id,status){await fetch("/api/tasks/"+id,{method:"PATCH",headers:json,body:JSON.stringify({status})});load();}
+async function del(id){await fetch("/api/tasks/"+id,{method:"DELETE"});load();}
+document.getElementById("f").onsubmit=async e=>{
+  e.preventDefault();const i=document.getElementById("title");
+  await fetch("/api/tasks",{method:"POST",headers:json,body:JSON.stringify({title:i.value})});
+  i.value="";load();
+};
+load();
+</script>
+</body>
+</html>
